@@ -125,7 +125,7 @@ function findFollowingEvent(events_cache) {
   const future = events_cache
     .filter(e => now < new Date(e.endDate))
     .sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
-  return future[1];
+  return future[1] || null;
 }
 
 function formatTime(ms) {
@@ -145,10 +145,10 @@ function render(){
   
   if (!next) {
     document.body.className = "gray";
-    eventNameEl.textContent = previous ? `${previous.name} - Session Ended` : "No upcoming events";
-    eventNameEl.textContent = "No upcoming events";
+    eventNameEl.textContent = prev ? `${prev.name} - Session Ended` : "No upcoming events";
     timerTextEl.textContent = "--:--:--";
     eventTimesEl.textContent = "";
+    nextEventEl.textContent = "No further events";
     return;
   }
   const start = new Date(next.startDate);
@@ -169,7 +169,13 @@ function render(){
 
   }
   // Update the next event section in the top-right
-  nextEventEl.textContent = `${followingEvent.name} at ${followingEvent.startDate.toLocaleString()}`;
+  if (followingEvent) {
+    const followingStart = new Date(followingEvent.startDate);
+    nextEventEl.textContent =
+      `${followingEvent.name} at ${followingStart.toLocaleString()}`;
+  } else {
+    nextEventEl.textContent = "No further events";
+  }
 }
 
 async function init(){
@@ -177,7 +183,7 @@ async function init(){
     events=await fetch("/events").then(r=>r.json());
     console.log("Events loaded:", events);
   }catch(e){
-    eventName.textContent="Unable to load events";return;
+    eventNameEl.textContent="Unable to load events";return;
   }
   render();
   setInterval(render,1000);
