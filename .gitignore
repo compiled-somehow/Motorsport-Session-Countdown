@@ -1,0 +1,11 @@
+# Dependencies
+node_modules/
+
+# Runtime database
+WebServer/events.db
+WebServer/events.db-shm
+WebServer/events.db-wal
+
+# Environment and logs
+.env
+*.log
