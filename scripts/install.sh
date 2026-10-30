@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-REPO_URL="https://github.com/CamelBruh/Motorsport-Session-Countdown.git"
+REPO_URL="${REPO_URL:-https://github.com/CamelBruh/Motorsport-Session-Countdown.git}"
 REPO_BRANCH="${REPO_BRANCH:-main}"
 APP_DIR="${APP_DIR:-/opt/motorsport}"
 SERVICE_NAME="motorsport"
@@ -52,7 +52,7 @@ if [[ ! -f "$APP_DIR/WebServer/server.js" ]]; then
     git clone --branch "$REPO_BRANCH" "$REPO_URL" "$APP_DIR"
 
     log "Starting installer from the cloned repository."
-    export APP_DIR REPO_BRANCH
+    export APP_DIR REPO_BRANCH REPO_URL
     exec bash "$APP_DIR/scripts/install.sh"
 fi
 
