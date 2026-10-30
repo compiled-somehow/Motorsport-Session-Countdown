@@ -37,19 +37,56 @@ command -v systemctl >/dev/null || fail "systemd is required."
 [[ "$(ps -p 1 -o comm= | tr -d ' ')" == "systemd" ]] \
     || fail "systemd must be running as PID 1."
 
-# Bootstrap: clone the public GitHub repository.
-if [[ ! -f "$APP_DIR/WebServer/server.js" ]]; then
-    if [[ -e "$APP_DIR" ]] && [[ -n "$(ls -A "$APP_DIR" 2>/dev/null)" ]]; then
-        fail "$APP_DIR exists and is not an MSCountdown installation."
-    fi
+# Check whether the checkout contains all required application files.
+checkout_complete() {
+    [[ -f "$APP_DIR/scripts/install.sh" ]] &&
+    [[ -f "$APP_DIR/package.json" ]] &&
+    [[ -f "$APP_DIR/package-lock.json" ]] &&
+    [[ -f "$APP_DIR/WebServer/server.js" ]] &&
+    [[ -f "$APP_DIR/WebServer/public/index.html" ]] &&
+    [[ -f "$APP_DIR/WebServer/public/display.html" ]]
+}
 
+# Bootstrap or recover an incomplete checkout.
+if ! checkout_complete; then
     log "Installing Git and prerequisites."
     apt-get update
     apt-get install -y ca-certificates curl git
 
-    log "Cloning MSCountdown from GitHub."
-    mkdir -p "$(dirname "$APP_DIR")"
-    git clone --branch "$REPO_BRANCH" "$REPO_URL" "$APP_DIR"
+    if [[ -e "$APP_DIR" && ! -d "$APP_DIR" ]]; then
+        fail "$APP_DIR exists but is not a directory."
+    fi
+
+    if [[ -d "$APP_DIR" ]] && [[ -n "$(ls -A "$APP_DIR" 2>/dev/null)" ]]; then
+        if git -C "$APP_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+            if [[ ! -f "$APP_DIR/WebServer/server.js" &&
+                  ! -f "$APP_DIR/package.json" ]]; then
+                fail "$APP_DIR is a Git repository but does not look like an MSCountdown checkout."
+            fi
+
+            if [[ -n "$(git -C "$APP_DIR" status --porcelain --untracked-files=normal)" ]]; then
+                fail "$APP_DIR contains local or untracked changes. Resolve or back up these changes before retrying."
+            fi
+
+            log "Refreshing incomplete Git checkout."
+            if git -C "$APP_DIR" remote get-url origin >/dev/null 2>&1; then
+                git -C "$APP_DIR" remote set-url origin "$REPO_URL"
+            else
+                git -C "$APP_DIR" remote add origin "$REPO_URL"
+            fi
+
+            git -C "$APP_DIR" fetch --depth 1 origin "$REPO_BRANCH"
+            git -C "$APP_DIR" checkout -B "$REPO_BRANCH" FETCH_HEAD
+        else
+            fail "$APP_DIR exists and is not a valid MSCountdown Git checkout. Move it aside before installing."
+        fi
+    else
+        log "Cloning MSCountdown from GitHub."
+        mkdir -p "$(dirname "$APP_DIR")"
+        git clone --branch "$REPO_BRANCH" "$REPO_URL" "$APP_DIR"
+    fi
+
+    checkout_complete || fail "Repository checkout is incomplete. Check the repository URL and branch."
 
     log "Starting installer from the cloned repository."
     export APP_DIR REPO_BRANCH REPO_URL
@@ -58,9 +95,12 @@ fi
 
 # Validate the application checkout.
 for required_file in \
+    "$APP_DIR/scripts/install.sh" \
     "$APP_DIR/package.json" \
     "$APP_DIR/package-lock.json" \
-    "$APP_DIR/WebServer/server.js"
+    "$APP_DIR/WebServer/server.js" \
+    "$APP_DIR/WebServer/public/index.html" \
+    "$APP_DIR/WebServer/public/display.html"
 do
     [[ -f "$required_file" ]] || fail "Required file missing: $required_file"
 done
